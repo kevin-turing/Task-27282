@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Health Data Analysis</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse"></script>
+    <style>
+        body { font-family: Arial, sans-serif; }
+        .chart-container { width: 80%; margin: auto; }
+    </style>
+</head>
+<body>
+    <input type="file" id="csvFileInput" accept=".csv">
+    <div id="charts" class="chart-container"></div>
+
+    <script>
+    document.getElementById('csvFileInput').addEventListener('change', function(event) {
+        const file = event.target.files[0];
+        Papa.parse(file, {
+            header: true,
+            dynamicTyping: true,
+            complete: function(results) {
+                visualizeData(results.data);
+            }
+        });
+    });
+
+    function visualizeData(data) {
+        // Data processing would go here (calculate averages, prepare data for charts)
+        const activityCalories = data.reduce((acc, row) => {
+            acc[row.ActivityType] = (acc[row.ActivityType] || 0) + row.CaloriesBurned;
+            return acc;
+        }, {});
+
+        const ctx = document.createElement('canvas');
+        document.getElementById('charts').appendChild(ctx);
+
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: Object.keys(activityCalories),
+                datasets: [{
+                    label: 'Average Calories Burned per Activity',
+                    data: Object.values(activityCalories).map(val => val / data.filter(d => d.ActivityType === Object.keys(activityCalories)[Object.values(activityCalories).indexOf(val)]).length),
+                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: { display: true, text: 'Calories Burned' }
+                    }
+                }
+            }
+        });
+
+        // Additional charts for age, heart rate, predictive analysis etc., would follow here
+    }
+
+    // Predictive analysis and other complex visualizations would require more sophisticated JavaScript and possibly server-side processing or machine learning libraries.
+    </script>
+</body>
+</html>

@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Health Data Insights</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.0/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/ml5@0.12.2/dist/ml5.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f0f0f0; }
+        .container { max-width: 1200px; margin: 0 auto; background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1 { text-align: center; color: #333; }
+        .chart-container { width: 100%; margin: 20px 0; }
+        #fileInput { margin-bottom: 20px; }
+        .warning { color: red; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Health Data Insights</h1>
+        <input type="file" id="fileInput" accept=".csv">
+        <div id="charts"></div>
+    </div>
+
+    <script>
+    document.getElementById('fileInput').addEventListener('change', handleFileSelect, false);
+
+    function handleFileSelect(event) {
+        const file = event.target.files[0];
+        Papa.parse(file, {
+            header: true,
+            dynamicTyping: true,
+            complete: function(results) {
+                processData(results.data);
+            }
+        });
+    }
+
+    function processData(data) {
+        const chartsDiv = document.getElementById('charts');
+        chartsDiv.innerHTML = '';
+
+        // Activity and Calories
+        createChart('activityCalories', 'bar', 'Average Calories Burned by Activity Type', 
+            calculateAverageCaloriesByActivity(data));
+
+        // Activity Duration vs Calories
+        createChart('durationCalories', 'scatter', 'Activity Duration vs Calories Burned', 
+            data.map(d => ({x: d.ActivityDuration, y: d.CaloriesBurned})));
+
+        // Age, Activity, and Heart Rate
+        createComplexChart('ageActivityHeart', data);
+
+        // Sleep Quality by Activity
+        createChart('sleepQuality', 'bar', 'Average Sleep Quality by Activity Type', 
+            calculateAverageSleepQualityByActivity(data));
+
+        // Predictive Analysis
+        performPredictiveAnalysis(data);
+    }
+
+    function calculateAverageCaloriesByActivity(data) {
+        const activityCalories = {};
+        data.forEach(d => {
+            if (!activityCalories[d.ActivityType]) {
+                activityCalories[d.ActivityType] = { total: 0, count: 0 };
+            }
+            activityCalories[d.ActivityType].total += d.CaloriesBurned;
+            activityCalories[d.ActivityType].count++;
+        });
+        return Object.keys(activityCalories).map(activity => ({
+            x: activity,
+            y: activityCalories[activity].total / activityCalories[activity].count
+        }));
+    }
+
+    function calculateAverageSleepQualityByActivity(data) {
+        const activitySleep = {};
+        data.forEach(d => {
+            if (!activitySleep[d.ActivityType]) {
+                activitySleep[d.ActivityType] = { total: 0, count: 0 };
+            }
+            activitySleep[d.ActivityType].total += d.SleepQualityScore;
+            activitySleep[d.ActivityType].count++;
+        });
+        return Object.keys(activitySleep).map(activity => ({
+            x: activity,
+            y: activitySleep[activity].total / activitySleep[activity].count
+        }));
+    }
+
+    function createChart(id, type, title, data) {
+        const ctx = document.createElement('canvas');
+        ctx.id = id;
+        document.getElementById('charts').appendChild(ctx);
+
+        new Chart(ctx, {
+            type: type,
+            data: {
+                datasets: [{
+                    label: title,
+                    data: data,
+                    backgroundColor: 'rgba(75, 192, 192, 0.6)',
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                title: { display: true, text: title },
+                scales: {
+                    x: { type: 'category', title: { display: true, text: type === 'scatter' ? 'Duration (minutes)' : 'Activity Type' } },
+                    y: { beginAtZero: true, title: { display: true, text: type === 'scatter' ? 'Calories Burned' : 'Average Value' } }
+                }
+            }
+        });
+    }
+
+    function createComplexChart(id, data) {
+        const ctx = document.createElement('canvas');
+        ctx.id = id;
+        document.getElementById('charts').appendChild(ctx);
+
+        const ageGroups = ['18-30', '31-45', '46-60', '60+'];
+        const datasets = ageGroups.map(group => ({
+            label: group,
+            data: data.filter(d => getAgeGroup(d.Age) === group).map(d => ({
+                x: d.ActivityType,
+                y: d.HeartRateAvg,
+                r: d.CaloriesBurned / 10
+            })),
+            backgroundColor: getRandomColor()
+        }));
+
+        new Chart(ctx, {
+            type: 'bubble',
+            data: { datasets },
+            options: {
+                responsive: true,
+                title: { display: true, text: 'Age, Activity, Heart Rate, and Calories Burned' },
+                scales: {
+                    x: { type: 'category', title: { display: true, text: 'Activity Type' } },
+                    y: { beginAtZero: true, title: { display: true, text: 'Average Heart Rate' } }
+                },
+                tooltips: {
+                    callbacks: {
+                        label: function(tooltipItem, data) {
+                            const dataset = data.datasets[tooltipItem.datasetIndex];
+                            const datapoint = dataset.data[tooltipItem.index];
+                            return `Age: ${dataset.label}, Activity: ${datapoint.x}, Heart Rate: ${datapoint.y}, Calories: ${datapoint.r * 10}`;
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    function getAgeGroup(age) {
+        if (age <= 30) return '18-30';
+        if (age <= 45) return '31-45';
+        if (age <= 60) return '46-60';
+        return '60+';
+    }
+
+    function getRandomColor() {
+        return `rgba(${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)}, 0.6)`;
+    }
+
+    function performPredictiveAnalysis(data) {
+        const features = data.map(d => [d.Age, d.ActivityDuration]);
+        const labels = data.map(d => d.CaloriesBurned);
+
+        const trainingFeatures = features.slice(0, Math.floor(features.length * 0.8));
+        const trainingLabels = labels.slice(0, Math.floor(labels.length * 0.8));
+        const testingFeatures = features.slice(Math.floor(features.length * 0.8));
+
+        const model = ml5.neuralNetwork({
+            inputs: ['age', 'duration'],
+            outputs: ['calories'],
+            task: 'regression',
+            debug: true
+        });
+
+        trainingFeatures.forEach((features, i) => {
+            model.addData({ age: features[0], duration: features[1] }, { calories: trainingLabels[i] });
+        });
+
+        model.normalize();
+        model.train({ epochs: 50 }, () => {
+            console.log('Model trained');
+            testingFeatures.forEach(features => {
+                model.predict({ age: features[0], duration: features[1] }, (error, results) => {
+                    if (error) {
+                        console.error(error);
+                        return;
+                    }
+                    console.log(`Predicted calories for Age ${features[0]} and Duration ${features[1]}: ${results[0].value}`);
+                });
+            });
+        });
+    }
+    </script>
+</body>
+</html>
